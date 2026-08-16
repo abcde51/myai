@@ -4,438 +4,122 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>DeepSeek 手表端</title>
-  <!-- Font Awesome 6 (免费图标库) -->
+  <link rel="icon" href="data:,">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-  <!-- marked.js (Markdown渲染) -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <!-- DOMPurify (防止XSS) -->
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
-  <!-- tiktoken (浏览器版) -->
   <script src="https://cdn.jsdelivr.net/npm/@dqbd/tiktoken@1.0.7/dist/tiktoken.min.js"></script>
   <style>
-    /* 全局重置 & 深色主题 */
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      -webkit-tap-highlight-color: transparent;
-    }
-    body {
-      font-family: -apple-system, Helvetica, sans-serif;
-      background: #000;
-      color: #f5f5f7;
-      height: 100vh;
-      height: 100dvh;
-      overflow: hidden;
-      padding: 0;
-      margin: 0;
-      /* 安全区域适配 */
-      padding-bottom: env(safe-area-inset-bottom);
-      padding-left: env(safe-area-inset-left);
-      padding-right: env(safe-area-inset-right);
-    }
-    /* 隐藏滚动条 (但保留功能) */
-    ::-webkit-scrollbar {
-      width: 2px;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #555;
-      border-radius: 2px;
-    }
-    /* 主容器 */
-    #app {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-    }
-    /* ----- 折叠按钮 (悬浮) ----- */
-    #toggleBtn {
-      position: fixed;
-      bottom: 30px;
-      right: 20px;
-      width: 58px;
-      height: 58px;
-      border-radius: 50%;
-      background: #1c7ed6;
-      border: none;
-      color: #fff;
-      font-size: 28px;
-      box-shadow: 0 4px 12px rgba(28, 126, 214, 0.5);
-      z-index: 999;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: transform 0.2s, opacity 0.2s;
-      cursor: pointer;
-      touch-action: manipulation;
-    }
-    #toggleBtn:active {
-      transform: scale(0.88);
-      opacity: 0.7;
-    }
-    #toggleBtn .badge {
-      position: absolute;
-      top: -4px;
-      right: -4px;
-      background: #ff3b30;
-      color: #fff;
-      border-radius: 50%;
-      width: 22px;
-      height: 22px;
-      font-size: 12px;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: 2px solid #000;
-      display: none;
-    }
-    #toggleBtn .badge.show {
-      display: flex;
-    }
-    /* ----- 聊天面板 (折叠/展开) ----- */
-    #chatPanel {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: #0a0a0c;
-      display: flex;
-      flex-direction: column;
-      transform: translateY(100%);
-      transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-      z-index: 1000;
-      padding: 12px 12px 8px 12px;
-      padding-bottom: calc(8px + env(safe-area-inset-bottom));
-    }
-    #chatPanel.open {
-      transform: translateY(0);
-    }
-    /* 顶部栏 */
-    #header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding-bottom: 8px;
-      border-bottom: 1px solid #2c2c2e;
-      flex-shrink: 0;
-    }
-    #header .title {
-      font-size: 18px;
-      font-weight: 600;
-      letter-spacing: 0.5px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    #header .title i {
-      color: #1c7ed6;
-      font-size: 20px;
-    }
-    #header .actions {
-      display: flex;
-      gap: 14px;
-      align-items: center;
-    }
-    #header .actions button {
-      background: none;
-      border: none;
-      color: #8e8e93;
-      font-size: 20px;
-      cursor: pointer;
-      padding: 4px;
-      touch-action: manipulation;
-      transition: color 0.2s, transform 0.1s;
-    }
-    #header .actions button:active {
-      transform: scale(0.85);
-      color: #fff;
-    }
-    #header .actions .close-btn {
-      font-size: 24px;
-    }
-    /* Token 状态条 */
-    #tokenBar {
-      display: flex;
-      justify-content: space-between;
-      font-size: 11px;
-      color: #8e8e93;
-      padding: 6px 2px;
-      border-bottom: 1px solid #1c1c1e;
-      flex-shrink: 0;
-    }
-    #tokenBar .total-tokens {
-      color: #f5f5f7;
-    }
-    /* 消息列表 */
-    #messageList {
-      flex: 1;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-      padding: 8px 0 4px 0;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .msg {
-      max-width: 88%;
-      padding: 10px 14px;
-      border-radius: 18px;
-      font-size: 16px;
-      line-height: 1.45;
-      word-break: break-word;
-      animation: fadeIn 0.2s ease;
-    }
-    .msg.user {
-      align-self: flex-end;
-      background: #1c7ed6;
-      color: #fff;
-      border-bottom-right-radius: 6px;
-    }
-    .msg.assistant {
-      align-self: flex-start;
-      background: #1c1c1e;
-      color: #f5f5f7;
-      border-bottom-left-radius: 6px;
-    }
-    .msg .timestamp {
-      font-size: 10px;
-      opacity: 0.6;
-      margin-top: 6px;
-      text-align: right;
-    }
-    /* Markdown 渲染 (白名单) */
-    .msg.assistant p {
-      margin: 4px 0;
-    }
-    .msg.assistant strong {
-      font-weight: 700;
-      color: #ffb347;
-    }
-    .msg.assistant em {
-      font-style: italic;
-      color: #78c0ff;
-    }
-    .msg.assistant code {
-      background: #2c2c2e;
-      padding: 0 6px;
-      border-radius: 4px;
-      font-family: 'SF Mono', monospace;
-      font-size: 14px;
-      color: #e6b450;
-    }
-    .msg.assistant pre {
-      background: #1c1c1e;
-      padding: 10px;
-      border-radius: 8px;
-      overflow-x: auto;
-      margin: 6px 0;
-      border-left: 3px solid #1c7ed6;
-    }
-    .msg.assistant pre code {
-      background: transparent;
-      padding: 0;
-      color: #d4d4d4;
-      font-size: 14px;
-    }
-    .msg.assistant ul {
-      padding-left: 20px;
-      margin: 4px 0;
-    }
-    .msg.assistant li {
-      list-style-type: disc;
-    }
-    /* 输入区域 */
-    #inputArea {
-      display: flex;
-      align-items: flex-end;
-      gap: 8px;
-      padding-top: 8px;
-      border-top: 1px solid #2c2c2e;
-      flex-shrink: 0;
-      background: #0a0a0c;
-    }
-    #inputArea .input-wrap {
-      flex: 1;
-      background: #1c1c1e;
-      border-radius: 20px;
-      padding: 6px 12px;
-      display: flex;
-      align-items: flex-end;
-    }
-    #inputArea textarea {
-      width: 100%;
-      background: transparent;
-      border: none;
-      color: #f5f5f7;
-      font-size: 16px;
-      resize: none;
-      outline: none;
-      min-height: 36px;
-      max-height: 100px;
-      line-height: 1.4;
-      font-family: -apple-system, Helvetica, sans-serif;
-      padding: 4px 0;
-    }
-    #inputArea textarea::placeholder {
-      color: #636366;
-    }
-    #inputArea .token-preview {
-      font-size: 10px;
-      color: #8e8e93;
-      white-space: nowrap;
-      margin-left: 6px;
-      align-self: center;
-    }
-    #inputArea .send-btn {
-      background: #1c7ed6;
-      border: none;
-      border-radius: 50%;
-      width: 44px;
-      height: 44px;
-      color: #fff;
-      font-size: 20px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      cursor: pointer;
-      transition: background 0.2s, transform 0.1s;
-      touch-action: manipulation;
-    }
-    #inputArea .send-btn:active {
-      transform: scale(0.88);
-      background: #1565b0;
-    }
-    #inputArea .send-btn:disabled {
-      opacity: 0.4;
-      pointer-events: none;
-    }
-    /* 设置区域 (API Key) */
-    #settings {
-      padding: 4px 0 6px 0;
-      border-bottom: 1px solid #1c1c1e;
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    #settings input {
-      flex: 1;
-      background: #1c1c1e;
-      border: none;
-      border-radius: 14px;
-      padding: 6px 12px;
-      color: #f5f5f7;
-      font-size: 13px;
-      outline: none;
-      min-width: 0;
-    }
-    #settings input::placeholder {
-      color: #636366;
-    }
-    #settings .save-key {
-      background: none;
-      border: none;
-      color: #1c7ed6;
-      font-size: 18px;
-      padding: 4px 8px;
-      cursor: pointer;
-    }
-    /* 动画 */
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(6px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    /* 加载指示器 (三个点) */
-    .typing-indicator {
-      display: inline-flex;
-      gap: 4px;
-      align-items: center;
-      background: #1c1c1e;
-      padding: 8px 16px;
-      border-radius: 18px;
-      align-self: flex-start;
-    }
-    .typing-indicator span {
-      width: 8px;
-      height: 8px;
-      background: #8e8e93;
-      border-radius: 50%;
-      animation: bounce 1.4s infinite both;
-    }
-    .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
-    .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
-    @keyframes bounce {
-      0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
-      40% { transform: scale(1); opacity: 1; }
-    }
-    /* 空状态 */
-    .empty-state {
-      text-align: center;
-      color: #636366;
-      margin-top: 40px;
-      font-size: 14px;
-    }
-    .empty-state i {
-      font-size: 40px;
-      margin-bottom: 12px;
-      display: block;
-      color: #2c2c2e;
-    }
+    /* ---------- 全局重置 ---------- */
+    * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    body { font-family:-apple-system,Helvetica,sans-serif; background:#000; color:#f5f5f7; height:100vh; height:100dvh; overflow:hidden; padding:0; margin:0; padding-bottom:env(safe-area-inset-bottom); padding-left:env(safe-area-inset-left); padding-right:env(safe-area-inset-right); }
+    ::-webkit-scrollbar { width:2px; }
+    ::-webkit-scrollbar-thumb { background:#555; border-radius:2px; }
+    #app { position:relative; width:100%; height:100%; display:flex; flex-direction:column; }
+    /* 折叠按钮 */
+    #toggleBtn { position:fixed; bottom:30px; right:20px; width:58px; height:58px; border-radius:50%; background:#1c7ed6; border:none; color:#fff; font-size:28px; box-shadow:0 4px 12px rgba(28,126,214,0.5); z-index:999; display:flex; align-items:center; justify-content:center; transition:transform .2s,opacity .2s; cursor:pointer; touch-action:manipulation; }
+    #toggleBtn:active { transform:scale(.88); opacity:.7; }
+    #toggleBtn .badge { position:absolute; top:-4px; right:-4px; background:#ff3b30; color:#fff; border-radius:50%; width:22px; height:22px; font-size:12px; font-weight:600; display:flex; align-items:center; justify-content:center; border:2px solid #000; display:none; }
+    #toggleBtn .badge.show { display:flex; }
+    /* 聊天面板 */
+    #chatPanel { position:fixed; top:0; left:0; right:0; bottom:0; background:#0a0a0c; display:flex; flex-direction:column; transform:translateY(100%); transition:transform .3s cubic-bezier(.25,.46,.45,.94); z-index:1000; padding:12px 12px 8px; padding-bottom:calc(8px + env(safe-area-inset-bottom)); }
+    #chatPanel.open { transform:translateY(0); }
+    #header { display:flex; align-items:center; justify-content:space-between; padding-bottom:8px; border-bottom:1px solid #2c2c2e; flex-shrink:0; }
+    #header .title { font-size:18px; font-weight:600; display:flex; align-items:center; gap:8px; }
+    #header .title i { color:#1c7ed6; font-size:20px; }
+    #header .actions { display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+    #header .actions button { background:none; border:none; color:#8e8e93; font-size:20px; cursor:pointer; padding:4px; touch-action:manipulation; transition:color .2s,transform .1s; }
+    #header .actions button:active { transform:scale(.85); color:#fff; }
+    #header .actions .close-btn { font-size:24px; }
+    /* 推理强度选择器 */
+    #reasoning-selector { display:flex; align-items:center; gap:6px; margin-left:4px; }
+    #reasoning-selector label { font-size:11px; color:#8e8e93; }
+    #reasoning-selector select { background:#1c1c1e; border:1px solid #3a3a3c; color:#f5f5f7; border-radius:12px; padding:2px 6px; font-size:12px; outline:none; }
+    #reasoning-selector select option { background:#1c1c1e; }
+    /* 功能栏 */
+    #functionBar { display:flex; align-items:center; gap:6px; padding:4px 2px 2px 2px; border-bottom:1px solid #1c1c1e; flex-shrink:0; flex-wrap:wrap; }
+    #functionBar .func-btn { background:rgba(255,255,255,0.05); border:1px solid #3a3a3c; color:#8e8e93; font-size:14px; padding:3px 10px; border-radius:14px; display:flex; align-items:center; gap:4px; cursor:pointer; transition:background .2s,color .2s,border-color .2s; touch-action:manipulation; }
+    #functionBar .func-btn:active { transform:scale(.85); }
+    #functionBar .func-btn.active { color:#1c7ed6; background:rgba(28,126,214,0.2); border-color:#1c7ed6; }
+    #functionBar .func-btn .badge-text { font-size:10px; font-weight:500; }
+    #tokenBar { display:flex; justify-content:space-between; font-size:11px; color:#8e8e93; padding:6px 2px; border-bottom:1px solid #1c1c1e; flex-shrink:0; }
+    #tokenBar .total-tokens { color:#f5f5f7; }
+    #messageList { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:8px 0 4px; display:flex; flex-direction:column; gap:10px; }
+    .msg { max-width:88%; padding:10px 14px; border-radius:18px; font-size:16px; line-height:1.45; word-break:break-word; animation:fadeIn .2s ease; }
+    .msg.user { align-self:flex-end; background:#1c7ed6; color:#fff; border-bottom-right-radius:6px; }
+    .msg.assistant { align-self:flex-start; background:#1c1c1e; color:#f5f5f7; border-bottom-left-radius:6px; }
+    .msg.system { align-self:center; background:#2c2c2e; color:#aaa; border-radius:12px; font-size:14px; padding:6px 12px; max-width:95%; border:1px dashed #555; }
+    .msg .timestamp { font-size:10px; opacity:.6; margin-top:6px; text-align:right; }
+    .msg.assistant p { margin:4px 0; }
+    .msg.assistant strong { font-weight:700; color:#ffb347; }
+    .msg.assistant em { font-style:italic; color:#78c0ff; }
+    .msg.assistant code { background:#2c2c2e; padding:0 6px; border-radius:4px; font-family:'SF Mono',monospace; font-size:14px; color:#e6b450; }
+    .msg.assistant pre { background:#1c1c1e; padding:10px; border-radius:8px; overflow-x:auto; margin:6px 0; border-left:3px solid #1c7ed6; }
+    .msg.assistant pre code { background:transparent; padding:0; color:#d4d4d4; font-size:14px; }
+    .msg.assistant ul { padding-left:20px; margin:4px 0; }
+    .msg.assistant li { list-style-type:disc; }
+    #inputArea { display:flex; align-items:flex-end; gap:6px; padding-top:8px; border-top:1px solid #2c2c2e; flex-shrink:0; background:#0a0a0c; }
+    #inputArea .input-wrap { flex:1; background:#1c1c1e; border-radius:20px; padding:6px 12px; display:flex; align-items:flex-end; }
+    #inputArea textarea { width:100%; background:transparent; border:none; color:#f5f5f7; font-size:16px; resize:none; outline:none; min-height:36px; max-height:100px; line-height:1.4; font-family:-apple-system,Helvetica,sans-serif; padding:4px 0; }
+    #inputArea textarea::placeholder { color:#636366; }
+    #inputArea .token-preview { font-size:10px; color:#8e8e93; white-space:nowrap; margin-left:6px; align-self:center; }
+    #searchToggleBtn { background:none; border:none; color:#636366; font-size:22px; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:color .2s,background .2s; touch-action:manipulation; flex-shrink:0; }
+    #searchToggleBtn:active { transform:scale(.85); }
+    #searchToggleBtn.active { color:#1c7ed6; background:rgba(28,126,214,.15); }
+    .send-btn { background:#1c7ed6; border:none; border-radius:50%; width:44px; height:44px; color:#fff; font-size:20px; display:flex; align-items:center; justify-content:center; flex-shrink:0; cursor:pointer; transition:background .2s,transform .1s; touch-action:manipulation; }
+    .send-btn:active { transform:scale(.88); background:#1565b0; }
+    .send-btn:disabled { opacity:.4; pointer-events:none; }
+    #statusRow { display:flex; justify-content:space-between; padding:2px 8px 0 0; height:18px; font-size:9px; }
+    #statusRow .status-item { display:none; align-items:center; gap:3px; color:#8e8e93; }
+    #statusRow .status-item.active { display:inline-flex; }
+    #statusRow .status-item .dot { font-size:6px; color:#1c7ed6; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+    .empty-state { text-align:center; color:#636366; margin-top:40px; font-size:14px; }
+    .empty-state i { font-size:40px; margin-bottom:12px; display:block; color:#2c2c2e; }
+    /* 摘要加载指示 */
+    .summary-loading { color:#1c7ed6; font-size:13px; }
   </style>
 </head>
 <body>
 <div id="app">
-  <!-- 折叠按钮 -->
-  <button id="toggleBtn" aria-label="展开对话">
-    <i class="fas fa-comment-dots"></i>
-    <span class="badge" id="badge">0</span>
-  </button>
-
-  <!-- 聊天面板 -->
+  <button id="toggleBtn" aria-label="展开对话"><i class="fas fa-comment-dots"></i><span class="badge" id="badge">0</span></button>
   <div id="chatPanel">
-    <!-- 头部 -->
     <div id="header">
-      <div class="title">
-        <i class="fas fa-brain"></i> DeepSeek
-      </div>
+      <div class="title"><i class="fas fa-brain"></i> DeepSeek</div>
       <div class="actions">
+        <span id="reasoning-selector">
+          <label>🧠</label>
+          <select id="reasoningLevel">
+            <option value="low">关</option>
+            <option value="high" selected>高</option>
+            <option value="max">最高</option>
+          </select>
+        </span>
         <button id="clearBtn" aria-label="清空对话"><i class="fas fa-trash-alt"></i></button>
         <button id="closePanelBtn" class="close-btn" aria-label="折叠"><i class="fas fa-chevron-down"></i></button>
       </div>
     </div>
-
-    <!-- 设置 API Key -->
-    <div id="settings">
-      <input type="text" id="apiKeyInput" placeholder="输入 DeepSeek API Key">
-      <button class="save-key" id="saveKeyBtn"><i class="fas fa-check-circle"></i></button>
-    </div>
-
-    <!-- Token 状态 -->
     <div id="tokenBar">
       <span>预估输入: <span id="inputTokens">0</span> tokens</span>
       <span class="total-tokens">总消耗: <span id="totalTokens">0</span> tokens</span>
     </div>
-
-    <!-- 消息列表 -->
-    <div id="messageList">
-      <div class="empty-state">
-        <i class="fas fa-comment"></i>
-        开始你的对话吧
-      </div>
+    <!-- 功能按钮行 -->
+    <div id="functionBar">
+      <button class="func-btn" id="envToggleBtn"><i class="fas fa-location-dot"></i> <span class="badge-text">环境</span></button>
+      <button class="func-btn" id="summaryBtn"><i class="fas fa-file-alt"></i> <span class="badge-text">摘要</span></button>
     </div>
-
-    <!-- 输入区域 -->
+    <div id="messageList"><div class="empty-state"><i class="fas fa-comment"></i>开始你的对话吧</div></div>
     <div id="inputArea">
       <div class="input-wrap">
         <textarea id="userInput" rows="1" placeholder="输入消息..." autocomplete="off"></textarea>
         <span class="token-preview" id="inputTokenPreview">0</span>
       </div>
+      <button id="searchToggleBtn" aria-label="切换联网搜索"><i class="fas fa-globe"></i></button>
       <button class="send-btn" id="sendBtn"><i class="fas fa-paper-plane"></i></button>
+    </div>
+    <div id="statusRow">
+      <span class="status-item" id="envStatus"><span class="dot">●</span> 环境已开启</span>
+      <span class="status-item" id="searchStatus"><span class="dot">●</span> 搜索已开启</span>
     </div>
   </div>
 </div>
@@ -444,7 +128,15 @@
   (function(){
     "use strict";
 
-    // ----- DOM 引用 -----
+    // ============================================================
+    // 1. 硬编码 API Keys
+    // ============================================================
+    const DEEPSEEK_API_KEY = 'sk-49dfc9f614fc4e87b85bec5842b55dc1';
+    const TAVILY_API_KEY  = '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';
+
+    // ============================================================
+    // 2. DOM 引用
+    // ============================================================
     const toggleBtn = document.getElementById('toggleBtn');
     const chatPanel = document.getElementById('chatPanel');
     const closePanelBtn = document.getElementById('closePanelBtn');
@@ -452,98 +144,338 @@
     const messageList = document.getElementById('messageList');
     const userInput = document.getElementById('userInput');
     const sendBtn = document.getElementById('sendBtn');
-    const apiKeyInput = document.getElementById('apiKeyInput');
-    const saveKeyBtn = document.getElementById('saveKeyBtn');
     const totalTokensSpan = document.getElementById('totalTokens');
     const inputTokensSpan = document.getElementById('inputTokens');
     const inputTokenPreview = document.getElementById('inputTokenPreview');
     const badge = document.getElementById('badge');
+    const searchToggleBtn = document.getElementById('searchToggleBtn');
+    const searchStatus = document.getElementById('searchStatus');
+    const envToggleBtn = document.getElementById('envToggleBtn');
+    const envStatus = document.getElementById('envStatus');
+    const summaryBtn = document.getElementById('summaryBtn');
+    const reasoningSelect = document.getElementById('reasoningLevel');
 
-    // ----- 状态 -----
-    let isOpen = false;
-    let messages = [];              // { role, content, timestamp? }
-    let totalTokens = 0;
-    let isWaiting = false;          // 是否正在等待 AI 回复
-    let currentAssistantMsg = null; // 用于流式拼接的 DOM 元素
-    let abortController = null;
-
-    // ----- 存储键名 -----
-    const STORAGE_KEY = 'deepseek_watch_chat';
-    const API_KEY_STORAGE = 'deepseek_watch_apikey';
-
-    // ----- 初始化 tiktoken (cl100k_base) -----
-    let tokenEncoder = null;
-    async function initTiktoken() {
-      try {
-        // 使用全局的 tiktoken (从 CDN 加载)
-        const { Tiktoken } = window.tiktoken;
-        tokenEncoder = await Tiktoken.getEncoding('cl100k_base');
-      } catch (e) {
-        console.warn('tiktoken 加载失败，将使用粗略估算', e);
-        // 降级: 简单字符数 / 4
-        tokenEncoder = {
-          encode: (text) => { return { length: Math.ceil(text.length / 4) }; }
-        };
-      }
+    if (!toggleBtn || !chatPanel || !userInput || !sendBtn) {
+      console.error('关键 DOM 缺失');
+      return;
     }
 
-    // ----- 计算 Token (实时) -----
+    // ============================================================
+    // 3. 状态变量
+    // ============================================================
+    let isOpen = false;
+    let messages = [];
+    let totalTokens = 0;
+    let isWaiting = false;
+    let abortController = null;
+    let tokenEncoder = null;
+    let searchMode = false;
+    let envMode = false;
+    const STORAGE_KEY = 'deepseek_watch_chat';
+
+    // ============================================================
+    // 4. 工具函数
+    // ============================================================
+    function safeMarked(text) {
+      if (typeof marked !== 'undefined' && marked.parse) {
+        try { return marked.parse(text, { breaks: true, gfm: true }); } catch (_) {}
+      }
+      return null;
+    }
+    function safeDOMPurify(html) {
+      if (typeof DOMPurify !== 'undefined' && DOMPurify.sanitize) {
+        try {
+          return DOMPurify.sanitize(html, {
+            ALLOWED_TAGS: ['strong','em','code','pre','ul','li','p','br','span'],
+            ALLOWED_ATTR: ['class'],
+            FORBID_ATTR: ['style','onerror','onload']
+          });
+        } catch (_) {}
+      }
+      return null;
+    }
+    function renderMarkdown(text) {
+      if (!text) return '';
+      let html = safeMarked(text);
+      if (html) {
+        let clean = safeDOMPurify(html);
+        if (clean) return clean;
+      }
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML.replace(/\n/g, '<br>');
+    }
+
     function countTokens(text) {
       if (!text) return 0;
       if (tokenEncoder) {
-        try {
-          const encoded = tokenEncoder.encode(text);
-          return encoded.length;
-        } catch (e) {
-          return Math.ceil(text.length / 4);
+        try { return tokenEncoder.encode(text).length; } catch (_) {}
+      }
+      return Math.ceil(text.length / 4);
+    }
+
+    function getCurrentTimeStr() {
+      return new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+    }
+
+    // ============================================================
+    // 5. 环境数据收集 (IP定位 + 其他)
+    // ============================================================
+    async function getIPLocation() {
+      try {
+        const res = await fetch('https://ip-api.com/json/?fields=status,country,regionName,city');
+        if (!res.ok) throw new Error('ip-api 响应错误');
+        const data = await res.json();
+        if (data.status === 'success') {
+          return `${data.country} ${data.regionName} ${data.city}`;
         }
-      } else {
-        return Math.ceil(text.length / 4);
+      } catch (e) {
+        console.warn('ip-api 失败，尝试备用', e);
+      }
+      try {
+        const res2 = await fetch('https://ipapi.co/json/');
+        if (!res2.ok) throw new Error('ipapi.co 响应错误');
+        const data2 = await res2.json();
+        if (data2.country_name && data2.region && data2.city) {
+          return `${data2.country_name} ${data2.region} ${data2.city}`;
+        }
+      } catch (e2) {
+        console.warn('ipapi.co 也失败', e2);
+      }
+      return null;
+    }
+
+    function getBatteryInfo() {
+      return new Promise((resolve) => {
+        if (!navigator.getBattery) { resolve(null); return; }
+        navigator.getBattery().then(battery => {
+          const level = Math.round(battery.level * 100);
+          const charging = battery.charging ? '充电中' : '未充电';
+          resolve({ level, charging });
+        }).catch(() => resolve(null));
+      });
+    }
+
+    function getNetworkType() {
+      if (navigator.connection) {
+        const type = navigator.connection.effectiveType || '未知';
+        const downlink = navigator.connection.downlink ? ` (${navigator.connection.downlink}Mbps)` : '';
+        return type + downlink;
+      }
+      return '未知';
+    }
+
+    function getSystemLanguage() {
+      return navigator.language || navigator.languages?.[0] || '未知';
+    }
+
+    function getScreenSize() {
+      return `${window.screen.width}×${window.screen.height}`;
+    }
+
+    async function collectEnvironment() {
+      const [location, battery] = await Promise.all([
+        getIPLocation(),
+        getBatteryInfo()
+      ]);
+      let lines = [];
+      lines.push(`当前时间：${getCurrentTimeStr()}`);
+      lines.push(`位置：${location || '未知（IP定位失败）'}`);
+      if (battery) lines.push(`电量：${battery.level}%（${battery.charging}）`);
+      lines.push(`网络类型：${getNetworkType()}`);
+      lines.push(`系统语言：${getSystemLanguage()}`);
+      lines.push(`屏幕尺寸：${getScreenSize()}`);
+      return lines.join('\n');
+    }
+
+    // ============================================================
+    // 6. API 调用函数 (非流式/流式)
+    // ============================================================
+    async function callDeepSeekNonStream(messages, model = 'deepseek-v4-flash', maxTokens = 2000, reasoning = 'high') {
+      const requestBody = {
+        model: model,
+        messages: messages,
+        stream: false,
+        max_tokens: maxTokens,
+        temperature: 0.7
+      };
+      // 推理强度参数 (如果API支持)
+      if (reasoning && reasoning !== 'low') {
+        requestBody.reasoning_effort = reasoning; // 'high' 或 'max'
+      }
+      const response = await fetch('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
+        },
+        body: JSON.stringify(requestBody)
+      });
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`DeepSeek API 错误 (${response.status}): ${errText}`);
+      }
+      const data = await response.json();
+      return data.choices[0].message.content.trim();
+    }
+
+    async function callDeepSeekStream(messages, model = 'deepseek-v4-pro', reasoning = 'high', onChunk) {
+      const requestBody = {
+        model: model,
+        messages: messages,
+        stream: true,
+        max_tokens: 2000,
+        temperature: 0.7
+      };
+      if (reasoning && reasoning !== 'low') {
+        requestBody.reasoning_effort = reasoning;
+      }
+      const response = await fetch('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
+        },
+        body: JSON.stringify(requestBody)
+      });
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`DeepSeek API 错误 (${response.status}): ${errText}`);
+      }
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+      let accumulated = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || !trimmed.startsWith('data: ')) continue;
+          const data = trimmed.slice(6);
+          if (data === '[DONE]') continue;
+          try {
+            const json = JSON.parse(data);
+            const delta = json.choices[0].delta;
+            if (delta && delta.content) {
+              accumulated += delta.content;
+              onChunk(accumulated);
+            }
+            if (json.usage) {
+              totalTokens += json.usage.total_tokens || 0;
+              if (totalTokensSpan) totalTokensSpan.textContent = totalTokens;
+            }
+          } catch (_) {}
+        }
+      }
+      return accumulated;
+    }
+
+    // ============================================================
+    // 7. Tavily 搜索 (与之前相同)
+    // ============================================================
+    async function searchTavily(query) {
+      const response = await fetch('https://api.tavily.com/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${TAVILY_API_KEY}`
+        },
+        body: JSON.stringify({
+          query: query,
+          max_results: 5,
+          include_raw_content: false,
+          include_images: false,
+          search_depth: 'basic'
+        })
+      });
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Tavily 搜索失败 (${response.status}): ${errText}`);
+      }
+      const data = await response.json();
+      if (!data.results || data.results.length === 0) return null;
+      return data.results.map((r, idx) =>
+        `[${idx+1}] ${r.title}\n摘要: ${r.content || '无摘要'}\n来源: ${r.url}`
+      ).join('\n\n');
+    }
+
+    // ============================================================
+    // 8. 对话摘要功能 (使用 flash 模型，短摘要)
+    // ============================================================
+    async function generateSummary() {
+      if (isWaiting) return;
+      if (messages.length === 0) {
+        alert('当前没有对话可摘要。');
+        return;
+      }
+      // 构造摘要请求
+      const conversationText = messages.map(m => `${m.role === 'user' ? '用户' : '助手'}: ${m.content}`).join('\n');
+      const systemPrompt = '你是一个极简摘要助手。请用10-15个字概括以下对话的核心内容，只输出摘要，不要其他文字。';
+      const userPrompt = `对话内容：\n${conversationText}`;
+      const summaryMessages = [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ];
+      // 显示等待状态
+      const placeholder = document.createElement('div');
+      placeholder.className = 'msg system';
+      placeholder.innerHTML = '<span class="summary-loading">⏳ 正在生成摘要...</span>';
+      messageList.appendChild(placeholder);
+      scrollToBottom();
+
+      try {
+        const summary = await callDeepSeekNonStream(summaryMessages, 'deepseek-v4-flash', 50, 'low'); // 摘要不需要深度推理
+        // 移除占位
+        placeholder.remove();
+        // 显示摘要消息（系统样式）
+        const summaryMsg = {
+          role: 'system',
+          content: `📋 对话摘要: ${summary}`,
+          timestamp: Date.now()
+        };
+        // 不存储到messages，只显示
+        const el = document.createElement('div');
+        el.className = 'msg system';
+        el.innerHTML = renderMarkdown(summaryMsg.content);
+        const ts = document.createElement('div');
+        ts.className = 'timestamp';
+        ts.textContent = new Date(summaryMsg.timestamp).toLocaleTimeString();
+        el.appendChild(ts);
+        messageList.appendChild(el);
+        scrollToBottom();
+      } catch (err) {
+        placeholder.remove();
+        alert('生成摘要失败: ' + err.message);
+        console.error(err);
       }
     }
 
-    // ----- 更新 Token 显示 -----
-    function updateTokenPreviews() {
-      const inputText = userInput.value;
-      const count = countTokens(inputText);
-      inputTokensSpan.textContent = count;
-      inputTokenPreview.textContent = count;
-    }
-
-    // ----- 渲染消息 (支持白名单 Markdown) -----
-    function renderMarkdown(text) {
-      if (!text) return '';
-      // 使用 marked 解析
-      let html = marked.parse(text, { breaks: true, gfm: true });
-      // 使用 DOMPurify 清洗，只保留安全标签 (白名单)
-      const allowedTags = ['strong', 'em', 'code', 'pre', 'ul', 'li', 'p', 'br', 'span'];
-      const clean = DOMPurify.sanitize(html, {
-        ALLOWED_TAGS: allowedTags,
-        ALLOWED_ATTR: ['class'],
-        FORBID_ATTR: ['style', 'onerror', 'onload'],
-      });
-      return clean;
-    }
-
+    // ============================================================
+    // 9. UI 操作
+    // ============================================================
     function createMessageElement(role, content, timestamp) {
       const div = document.createElement('div');
       div.className = `msg ${role}`;
       if (role === 'assistant') {
-        // 使用 innerHTML 渲染 Markdown
+        div.innerHTML = renderMarkdown(content);
+      } else if (role === 'system') {
         div.innerHTML = renderMarkdown(content);
       } else {
         div.textContent = content;
       }
       if (timestamp) {
-        const timeSpan = document.createElement('div');
-        timeSpan.className = 'timestamp';
-        timeSpan.textContent = new Date(timestamp).toLocaleTimeString();
-        div.appendChild(timeSpan);
+        const ts = document.createElement('div');
+        ts.className = 'timestamp';
+        ts.textContent = new Date(timestamp).toLocaleTimeString();
+        div.appendChild(ts);
       }
       return div;
     }
 
-    // ----- 重新渲染所有消息 -----
     function renderAllMessages() {
       messageList.innerHTML = '';
       if (messages.length === 0) {
@@ -553,65 +485,24 @@
         messageList.appendChild(empty);
         return;
       }
-      // 显示所有消息，除了可能还在流式拼接的那条（但我们已经单独处理）
       messages.forEach(msg => {
-        const el = createMessageElement(msg.role, msg.content, msg.timestamp);
-        messageList.appendChild(el);
+        // 跳过系统消息（摘要我们单独存储？但我们不存储摘要到messages）
+        if (msg.role === 'system') return; // 摘要不存储
+        messageList.appendChild(createMessageElement(msg.role, msg.content, msg.timestamp));
       });
       scrollToBottom();
     }
 
     function scrollToBottom() {
-      setTimeout(() => {
-        messageList.scrollTop = messageList.scrollHeight;
-      }, 50);
+      setTimeout(() => { messageList.scrollTop = messageList.scrollHeight; }, 50);
     }
 
-    // ----- 保存到 localStorage -----
-    function saveChat() {
-      try {
-        const data = {
-          messages: messages,
-          totalTokens: totalTokens,
-          timestamp: Date.now()
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      } catch (e) {
-        console.warn('保存失败', e);
-      }
+    function updateTokenPreviews() {
+      const count = countTokens(userInput.value);
+      if (inputTokensSpan) inputTokensSpan.textContent = count;
+      if (inputTokenPreview) inputTokenPreview.textContent = count;
     }
 
-    // ----- 加载历史 -----
-    function loadChat() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return false;
-        const data = JSON.parse(raw);
-        if (data.messages && Array.isArray(data.messages)) {
-          messages = data.messages;
-          totalTokens = data.totalTokens || 0;
-          totalTokensSpan.textContent = totalTokens;
-          renderAllMessages();
-          return true;
-        }
-      } catch (e) {
-        console.warn('加载历史失败', e);
-      }
-      return false;
-    }
-
-    // ----- 清空对话 -----
-    function clearChat() {
-      if (isWaiting) return;
-      messages = [];
-      totalTokens = 0;
-      totalTokensSpan.textContent = '0';
-      saveChat();
-      renderAllMessages();
-      updateBadge();
-    }
-
-    // ----- 更新未读标记 (此处用于总消息数) -----
     function updateBadge() {
       const count = messages.filter(m => m.role === 'assistant').length;
       if (count > 0 && !isOpen) {
@@ -622,113 +513,268 @@
       }
     }
 
-    // ----- 添加消息并保存 -----
-    function addMessage(role, content) {
-      const msg = {
-        role: role,
-        content: content,
-        timestamp: Date.now()
-      };
-      messages.push(msg);
-      saveChat();
-      // 渲染新消息
-      const el = createMessageElement(role, content, msg.timestamp);
-      // 移除空状态
-      const empty = messageList.querySelector('.empty-state');
-      if (empty) empty.remove();
-      messageList.appendChild(el);
-      scrollToBottom();
-      updateBadge();
-      return el;
+    function updateSearchUI() {
+      searchToggleBtn.classList.toggle('active', searchMode);
+      searchStatus.classList.toggle('active', searchMode);
     }
 
-    // ----- 发送消息 (核心) -----
+    function updateEnvUI() {
+      envToggleBtn.classList.toggle('active', envMode);
+      envStatus.classList.toggle('active', envMode);
+    }
+
+    // ============================================================
+    // 10. 数据持久化
+    // ============================================================
+    function saveChat() {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ messages, totalTokens, timestamp: Date.now() })); } catch (_) {}
+    }
+
+    function loadChat() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return false;
+        const data = JSON.parse(raw);
+        if (data.messages && Array.isArray(data.messages)) {
+          messages = data.messages;
+          totalTokens = data.totalTokens || 0;
+          if (totalTokensSpan) totalTokensSpan.textContent = totalTokens;
+          renderAllMessages();
+          return true;
+        }
+      } catch (_) {}
+      return false;
+    }
+
+    function clearChat() {
+      if (isWaiting) return;
+      messages = [];
+      totalTokens = 0;
+      if (totalTokensSpan) totalTokensSpan.textContent = '0';
+      saveChat();
+      renderAllMessages();
+      updateBadge();
+    }
+
+    function addMessage(role, content) {
+      const msg = { role, content, timestamp: Date.now() };
+      messages.push(msg);
+      saveChat();
+      const empty = messageList.querySelector('.empty-state');
+      if (empty) empty.remove();
+      messageList.appendChild(createMessageElement(role, content, msg.timestamp));
+      scrollToBottom();
+      updateBadge();
+      return msg;
+    }
+
+    // ============================================================
+    // 11. 发送消息 (主对话)
+    // ============================================================
     async function sendMessage() {
       if (isWaiting) return;
       const text = userInput.value.trim();
       if (!text) return;
-      const apiKey = apiKeyInput.value.trim();
-      if (!apiKey) {
-        alert('请先输入有效的 DeepSeek API Key');
-        return;
-      }
 
-      // 添加用户消息
       addMessage('user', text);
       userInput.value = '';
       updateTokenPreviews();
-      // 禁用发送按钮，显示等待状态
       isWaiting = true;
       sendBtn.disabled = true;
 
-      // 显示占位 AI 消息 (会动态更新)
-      const assistantPlaceholder = document.createElement('div');
-      assistantPlaceholder.className = 'msg assistant';
-      assistantPlaceholder.textContent = '...';
-      messageList.appendChild(assistantPlaceholder);
+      const placeholder = document.createElement('div');
+      placeholder.className = 'msg assistant';
+      placeholder.textContent = '...';
+      messageList.appendChild(placeholder);
       scrollToBottom();
 
-      // 构造请求参数
-      const systemPrompt = `你是一个运行在 Apple Watch 上的 AI 助手。受手表端渲染引擎限制，请严格遵守以下输出格式规范：
-1. 仅允许使用以下 Markdown 语法：**加粗**、*斜体*、\`行内代码\`、- 无序列表、\`\`\`代码块\`\`\`。
-2. 严禁使用：表格（| 符号）、一级/二级标题（#）、图片链接（![]()）、HTML 标签（如 <div> 等）、引用块（>）等复杂语法，以免渲染异常。
-3. 输出长度不受限制，无需刻意精简，但内容需结构清晰。若涉及步骤或并列要点，请优先使用 - 列表分行展示。`;
-
-      const requestMessages = [
-        { role: 'system', content: systemPrompt },
-        ...messages.slice(0, -1) // 不包括刚加入的用户消息？但我们已经加了，实际上 messages 已包含用户消息，但为了节省上下文，可以只取最近若干条。为简单，取全部（最多20条）
-      ];
-      // 但为了确保包含最后一条用户消息，我们用 messages 数组。
-      // 注意：上面 addMessage 已经加入，所以 messages 已经包含了最新用户消息。
-      // 但我们需要在请求中传递所有消息（包括刚添加的），所以直接使用 messages。
-      // 但 system 应该在最前。
-      const payloadMessages = [
-        { role: 'system', content: systemPrompt },
-        ...messages
-      ];
-
-      // 如果太长，截断至最近 20 条（防止超上下文）
-      if (payloadMessages.length > 20) {
-        // 保留 system + 最近 19 条
-        const keep = payloadMessages.slice(-19);
-        payloadMessages = [payloadMessages[0], ...keep];
-      }
-
-      const requestBody = {
-        model: 'deepseek-chat',
-        messages: payloadMessages,
-        stream: true,
-        max_tokens: 2000,
-        temperature: 0.7
-      };
-
-      let accumulatedContent = '';
-      let finishReason = '';
-
       try {
-        abortController = new AbortController();
-        const response = await fetch('https://api.deepseek.com/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-          },
-          body: JSON.stringify(requestBody),
-          signal: abortController.signal
-        });
-
-        if (!response.ok) {
-          const errText = await response.text();
-          throw new Error(`API 错误 (${response.status}): ${errText}`);
+        let envData = null;
+        if (envMode) {
+          placeholder.innerHTML = renderMarkdown('📡 正在获取环境信息...');
+          envData = await collectEnvironment();
+          placeholder.innerHTML = renderMarkdown('✅ 环境信息已获取');
         }
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder('utf-8');
-        let buffer = '';
+        let searchResults = null;
+        let searchQuery = null;
+        if (searchMode) {
+          placeholder.innerHTML = renderMarkdown('🧠 正在生成搜索关键词...');
+          try {
+            const queryPrompt = `用户问题：${text}\n请生成一个最合适的网络搜索关键词，只输出关键词，不要有其他内容。`;
+            searchQuery = await callDeepSeekNonStream([
+              { role: 'system', content: '你是一个搜索关键词生成助手，只输出关键词，不要有其他内容。' },
+              { role: 'user', content: queryPrompt }
+            ], 'deepseek-v4-flash', 50, 'low');
+            searchQuery = searchQuery.replace(/["“”]/g, '').trim();
+            if (!searchQuery) searchQuery = text;
+          } catch (err) {
+            console.warn('生成搜索词失败，使用原始输入', err);
+            searchQuery = text;
+          }
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+          placeholder.innerHTML = renderMarkdown(`🔍 正在搜索: "${searchQuery}" ...`);
+          try {
+            searchResults = await searchTavily(searchQuery);
+            if (searchResults) {
+              placeholder.innerHTML = renderMarkdown('✅ 搜索完成');
+            } else {
+              searchResults = null;
+              placeholder.innerHTML = renderMarkdown('⚠️ 未找到相关结果');
+            }
+          } catch (err) {
+            console.error('Tavily 搜索出错:', err);
+            searchResults = null;
+            placeholder.innerHTML = renderMarkdown('❌ 搜索服务异常');
+          }
+        }
 
-          buffer += decoder.decode(value, { stream: true });
-          const line
+        // 构造 System Prompt
+        let systemPrompt = '你是一个 AI 助手。\n';
+        if (envMode && envData) {
+          systemPrompt += '以下是当前设备的一些实时信息，供你参考：\n';
+          systemPrompt += envData + '\n';
+        }
+        if (searchMode && searchResults) {
+          systemPrompt += `\n用户开启了联网搜索，以下是搜索关键词 "${searchQuery}" 返回的结果：\n${searchResults}\n`;
+        } else if (searchMode && !searchResults) {
+          systemPrompt += `\n用户开启了联网搜索，但未获取到有效结果。\n`;
+        }
+
+        let payloadMessages = [
+          { role: 'system', content: systemPrompt },
+          ...messages
+        ];
+        if (payloadMessages.length > 20) {
+          payloadMessages = [payloadMessages[0], ...payloadMessages.slice(-19)];
+        }
+
+        placeholder.innerHTML = '';
+
+        // 获取推理强度
+        const reasoning = reasoningSelect.value; // 'low', 'high', 'max'
+        // 主对话使用 deepseek-v4-pro
+        const model = 'deepseek-v4-pro';
+
+        abortController = new AbortController();
+        const accumulatedContent = await callDeepSeekStream(payloadMessages, model, reasoning, (chunk) => {
+          placeholder.innerHTML = renderMarkdown(chunk);
+          scrollToBottom();
+        });
+
+        if (accumulatedContent) {
+          placeholder.remove();
+          const finalMsg = { role: 'assistant', content: accumulatedContent, timestamp: Date.now() };
+          messages.push(finalMsg);
+          messageList.appendChild(createMessageElement('assistant', accumulatedContent, finalMsg.timestamp));
+          scrollToBottom();
+          if (totalTokens === 0) {
+            const promptCount = payloadMessages.reduce((acc, m) => acc + countTokens(m.content), 0);
+            const completionCount = countTokens(accumulatedContent);
+            totalTokens = promptCount + completionCount;
+            if (totalTokensSpan) totalTokensSpan.textContent = totalTokens;
+          }
+          saveChat();
+        } else {
+          placeholder.remove();
+        }
+
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          console.error('请求失败', error);
+          placeholder.innerHTML = renderMarkdown(`❌ 错误: ${error.message || '请检查网络或API Key'}`);
+          placeholder.style.color = '#ff453a';
+        } else {
+          placeholder.remove();
+        }
+      } finally {
+        isWaiting = false;
+        sendBtn.disabled = false;
+        abortController = null;
+        updateBadge();
+      }
+    }
+
+    // ============================================================
+    // 12. 折叠控制
+    // ============================================================
+    function togglePanel(open) {
+      if (typeof open === 'boolean') isOpen = open;
+      else isOpen = !isOpen;
+      chatPanel.classList.toggle('open', isOpen);
+      if (isOpen) {
+        toggleBtn.style.display = 'none';
+        setTimeout(() => userInput.focus(), 300);
+        badge.classList.remove('show');
+      } else {
+        toggleBtn.style.display = 'flex';
+        updateBadge();
+      }
+    }
+
+    // ============================================================
+    // 13. 初始化
+    // ============================================================
+    async function init() {
+      toggleBtn.addEventListener('click', () => togglePanel());
+      closePanelBtn.addEventListener('click', () => togglePanel(false));
+      clearBtn.addEventListener('click', () => {
+        if (confirm('确定清空所有对话吗？')) clearChat();
+      });
+      sendBtn.addEventListener('click', sendMessage);
+      userInput.addEventListener('input', updateTokenPreviews);
+      userInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      });
+      if (messageList) {
+        messageList.addEventListener('touchstart', () => userInput.blur());
+      }
+
+      searchToggleBtn.addEventListener('click', () => {
+        searchMode = !searchMode;
+        updateSearchUI();
+        setTimeout(() => userInput.focus(), 100);
+      });
+
+      envToggleBtn.addEventListener('click', () => {
+        envMode = !envMode;
+        updateEnvUI();
+        setTimeout(() => userInput.focus(), 100);
+      });
+
+      summaryBtn.addEventListener('click', generateSummary);
+
+      // 加载 tiktoken
+      try {
+        const { Tiktoken } = window.tiktoken;
+        tokenEncoder = await Tiktoken.getEncoding('cl100k_base');
+      } catch (_) {
+        console.warn('tiktoken 加载失败，使用降级计数');
+      }
+
+      // 加载历史
+      const hasHistory = loadChat();
+      if (!hasHistory && messages.length === 0) {
+        addMessage('assistant', '你好！我是 DeepSeek。你可以开启「环境」开关（📍）让 AI 了解你的位置、电量等信息，开启「搜索」开关（🌐）让 AI 联网查询最新资讯。');
+      }
+
+      updateTokenPreviews();
+      updateBadge();
+      updateSearchUI();
+      updateEnvUI();
+
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) updateBadge();
+      });
+
+      console.log('DeepSeek 手表端初始化完成 (v4 模型 + 摘要 + 推理强度控制)');
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+  })();
+</script>
+</body>
+</html>
