@@ -1,751 +1,734 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>DeepSeek · Watch</title>
-<style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --bg: #0d1117;
-    --surface: #161b22;
-    --surface2: #1c2333;
-    --border: #30363d;
-    --text: #e6edf3;
-    --text2: #8b949e;
-    --user-bg: #1a5fb4;
-    --user-text: #fff;
-    --ai-bg: #21262d;
-    --reason-bg: #1c1a0e;
-    --reason-border: #bb8009;
-    --reason-text: #d29922;
-    --accent: #58a6ff;
-    --green: #3fb950;
-    --red: #f85149;
-    --radius: 10px;
-    --radius-sm: 6px;
-    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    --touch-min: 44px;
-    --header-h: 38px;
-    --input-h: 46px;
-    --font-msg: 14px;
-  }
-  html, body {
-    height: 100%; width: 100%;
-    font-family: var(--font);
-    background: var(--bg);
-    color: var(--text);
-    overflow: hidden;
-    -webkit-tap-highlight-color: transparent;
-    touch-action: manipulation;
-    -webkit-text-size-adjust: 100%;
-    user-select: none;
-  }
-
-  #app {
-    display: flex; flex-direction: column;
-    height: 100%; width: 100%;
-    max-width: 600px; margin: 0 auto;
-    position: relative;
-    background: var(--bg);
-    transform: translateZ(0);
-  }
-
-  /* ===== 顶栏 ===== */
-  .header {
-    display: flex; align-items: center; gap: 4px;
-    padding: 4px 8px;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-    height: var(--header-h);
-    min-height: var(--header-h);
-    transform: translateZ(0);
-    z-index: 10;
-  }
-  .header .logo { font-size: 16px; flex-shrink: 0; line-height: 1; }
-  .header .title {
-    font-size: 13px; font-weight: 700;
-    white-space: nowrap; flex-shrink: 0;
-    letter-spacing: -0.3px;
-  }
-  .header .spacer { flex: 1; min-width: 2px; }
-
-  /* 模式切换 */
-  .mode-group {
-    display: flex; gap: 2px;
-    background: var(--bg);
-    border-radius: var(--radius-sm);
-    padding: 2px;
-    flex-shrink: 0;
-  }
-  .mode-btn {
-    font-size: 11px; font-weight: 600;
-    padding: 0 10px;
-    height: 28px; min-width: 36px;
-    border: none; border-radius: 4px;
-    background: transparent; color: var(--text2);
-    cursor: pointer;
-    white-space: nowrap;
-    touch-action: manipulation;
-    transition: background 0.15s, color 0.15s;
-    -webkit-touch-callout: none;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .mode-btn.active {
-    background: var(--accent); color: #fff;
-  }
-  .mode-btn:active { opacity: 0.7; }
-
-  /* Token */
-  .token-badge {
-    font-size: 10px; color: var(--text2);
-    background: var(--bg); padding: 2px 7px;
-    border-radius: 20px; white-space: nowrap;
-    flex-shrink: 0; display: flex; align-items: center; gap: 2px;
-    height: 24px; line-height: 1;
-  }
-  .token-badge .num { color: var(--green); font-weight: 700; }
-
-  /* ===== 清空按钮 — 始终可见（有消息时） ===== */
-  .clear-btn {
-    font-size: 9px; color: var(--text2);
-    background: transparent;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 2px 7px;
-    cursor: pointer;
-    flex-shrink: 0;
-    height: 24px; line-height: 1;
-    touch-action: manipulation;
-    display: none;  /* 由 JS 控制 */
-    transition: background 0.15s, border-color 0.15s;
-  }
-  .clear-btn:active {
-    background: var(--surface2);
-    border-color: var(--red);
-    color: var(--red);
-  }
-  .clear-btn.visible { display: inline-flex; align-items: center; }
-
-  /* ===== 消息区 ===== */
-  .messages {
-    flex: 1; overflow-y: auto;
-    padding: 6px 8px;
-    display: flex; flex-direction: column; gap: 6px;
-    -webkit-overflow-scrolling: touch;
-    transform: translateZ(0);
-    will-change: scroll-position;
-    contain: layout style;
-  }
-  .messages::-webkit-scrollbar { width: 2px; }
-  .messages::-webkit-scrollbar-track { background: transparent; }
-  .messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-  .msg {
-    max-width: 96%; width: fit-content;
-    padding: 7px 10px;
-    border-radius: var(--radius);
-    font-size: var(--font-msg); line-height: 1.5;
-    word-wrap: break-word; overflow-wrap: break-word;
-    animation: fadeIn 0.2s ease;
-    position: relative;
-    transform: translateZ(0);
-  }
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(4px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  .msg.user {
-    align-self: flex-end;
-    background: var(--user-bg); color: var(--user-text);
-    border-bottom-right-radius: 4px;
-  }
-  .msg.ai {
-    align-self: flex-start;
-    background: var(--ai-bg); color: var(--text);
-    border-bottom-left-radius: 4px;
-  }
-  .msg.error {
-    align-self: center;
-    background: #3d1111; color: #f87171;
-    font-size: 12px; text-align: center;
-    max-width: 100%;
-    padding: 6px 10px;
-  }
-
-  /* 推理块 */
-  .reasoning-block {
-    background: var(--reason-bg);
-    border-left: 3px solid var(--reason-border);
-    border-radius: 4px;
-    padding: 6px 8px;
-    margin-bottom: 6px;
-    font-size: 12px;
-    color: var(--reason-text);
-    line-height: 1.5;
-    position: relative;
-  }
-  .reasoning-block .reason-label {
-    font-size: 9px; font-weight: 700;
-    color: var(--reason-border); display: block;
-    margin-bottom: 2px;
-    letter-spacing: 0.3px;
-  }
-  .reasoning-block .reason-toggle {
-    font-size: 9px; color: var(--text2);
-    background: none; border: none; cursor: pointer;
-    padding: 4px 6px; border-radius: 3px;
-    position: absolute; top: 2px; right: 4px;
-    touch-action: manipulation;
-    min-width: 36px; min-height: 28px;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .reasoning-block .reason-toggle:active { background: rgba(255,255,255,0.1); }
-
-  /* 加载 */
-  .typing {
-    align-self: flex-start;
-    display: flex; gap: 4px;
-    padding: 10px 14px;
-    background: var(--ai-bg);
-    border-radius: var(--radius);
-    border-bottom-left-radius: 4px;
-    transform: translateZ(0);
-  }
-  .typing span {
-    width: 6px; height: 6px;
-    background: var(--text2);
-    border-radius: 50%;
-    animation: bounce 1.2s ease-in-out infinite;
-    transform: translateZ(0);
-  }
-  .typing span:nth-child(2) { animation-delay: 0.2s; }
-  .typing span:nth-child(3) { animation-delay: 0.4s; }
-  @keyframes bounce {
-    0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
-    40% { transform: scale(1); opacity: 1; }
-  }
-
-  /* ===== 输入区 ===== */
-  .input-area {
-    display: flex; align-items: center; gap: 6px;
-    padding: 5px 8px;
-    background: var(--surface);
-    border-top: 1px solid var(--border);
-    flex-shrink: 0;
-    height: var(--input-h);
-    min-height: var(--input-h);
-    transform: translateZ(0);
-  }
-  .input-area textarea {
-    flex: 1; resize: none;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 6px 10px;
-    font-size: 14px; font-family: var(--font);
-    color: var(--text);
-    outline: none;
-    height: 34px;
-    max-height: 80px;
-    line-height: 1.4;
-    transition: border-color 0.2s;
-    -webkit-appearance: none;
-  }
-  .input-area textarea:focus { border-color: var(--accent); }
-  .input-area textarea::placeholder { color: var(--text2); font-size: 13px; }
-
-  .input-area .send-btn {
-    width: var(--touch-min); height: var(--touch-min);
-    min-width: var(--touch-min); min-height: var(--touch-min);
-    border: none; border-radius: 50%;
-    background: var(--accent); color: #fff;
-    font-size: 20px;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; flex-shrink: 0;
-    touch-action: manipulation;
-    transition: opacity 0.15s;
-    -webkit-touch-callout: none;
-  }
-  .input-area .send-btn:active { opacity: 0.6; }
-  .input-area .send-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-
-  /* ===== 撤销 Toast ===== */
-  .undo-toast {
-    position: absolute;
-    bottom: calc(var(--input-h) + 10px);
-    left: 8px; right: 8px;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 8px 10px;
-    font-size: 12px;
-    color: var(--text);
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 8px;
-    animation: slideUp 0.25s ease;
-    z-index: 20;
-    transform: translateZ(0);
-  }
-  @keyframes slideUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  .undo-toast .undo-btn {
-    font-size: 11px; font-weight: 600;
-    color: var(--accent);
-    background: none; border: none;
-    padding: 6px 12px;
-    cursor: pointer;
-    touch-action: manipulation;
-    min-height: 36px;
-    display: flex; align-items: center;
-  }
-  .undo-toast .undo-btn:active { opacity: 0.6; }
-
-  /* ===== 代码块 ===== */
-  .msg pre {
-    background: #0d1117; border-radius: 4px;
-    padding: 6px; overflow-x: auto;
-    font-size: 11px; margin: 4px 0;
-    border: 1px solid var(--border);
-    white-space: pre-wrap; word-break: break-all;
-  }
-  .msg code {
-    font-family: "SF Mono", "Monaco", "Menlo", monospace;
-    font-size: 0.9em;
-    background: rgba(255,255,255,0.08);
-    padding: 1px 3px; border-radius: 3px;
-  }
-  .msg pre code { background: none; padding: 0; }
-
-  /* ===== Apple Watch 适配 ===== */
-  @media (max-width: 380px) {
-    :root {
-      --header-h: 34px;
-      --input-h: 44px;
-      --touch-min: 40px;
-      --font-msg: 13px;
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>DeepSeek 手表端</title>
+  <!-- Font Awesome 6 (免费图标库) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <!-- marked.js (Markdown渲染) -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- DOMPurify (防止XSS) -->
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+  <!-- tiktoken (浏览器版) -->
+  <script src="https://cdn.jsdelivr.net/npm/@dqbd/tiktoken@1.0.7/dist/tiktoken.min.js"></script>
+  <style>
+    /* 全局重置 & 深色主题 */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
     }
-    .header { padding: 2px 5px; gap: 3px; }
-    .header .logo { font-size: 14px; }
-    .header .title { font-size: 11px; letter-spacing: -0.5px; }
-    .mode-btn { font-size: 10px; padding: 0 7px; height: 26px; min-width: 30px; }
-    .token-badge { font-size: 9px; height: 20px; padding: 1px 5px; }
-    .clear-btn { font-size: 8px; height: 20px; padding: 1px 5px; }
-    .messages { padding: 4px 5px; gap: 4px; }
-    .msg { font-size: 13px; padding: 5px 8px; max-width: 98%; }
-    .reasoning-block { font-size: 11px; padding: 4px 6px; }
-    .reasoning-block .reason-label { font-size: 8px; }
-    .reasoning-block .reason-toggle { font-size: 8px; min-width: 30px; min-height: 24px; padding: 2px 4px; }
-    .input-area { padding: 3px 5px; gap: 4px; }
-    .input-area textarea { font-size: 13px; padding: 4px 8px; height: 30px; }
-    .input-area textarea::placeholder { font-size: 12px; }
-    .input-area .send-btn { width: 36px; height: 36px; min-width: 36px; min-height: 36px; font-size: 17px; }
-    .typing { padding: 8px 12px; }
-    .typing span { width: 5px; height: 5px; }
-  }
-
-  @media (min-width: 381px) and (max-width: 430px) {
-    :root {
-      --header-h: 36px;
-      --input-h: 46px;
-      --touch-min: 44px;
-      --font-msg: 14px;
+    body {
+      font-family: -apple-system, Helvetica, sans-serif;
+      background: #000;
+      color: #f5f5f7;
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+      padding: 0;
+      margin: 0;
+      /* 安全区域适配 */
+      padding-bottom: env(safe-area-inset-bottom);
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
     }
-    .header { padding: 3px 6px; }
-    .header .title { font-size: 12px; }
-    .mode-btn { font-size: 11px; padding: 0 8px; height: 28px; }
-    .messages { padding: 5px 6px; }
-    .msg { padding: 6px 10px; }
-  }
-
-  @media (orientation: landscape) and (max-height: 380px) {
-    :root {
-      --header-h: 30px;
-      --input-h: 38px;
-      --touch-min: 36px;
+    /* 隐藏滚动条 (但保留功能) */
+    ::-webkit-scrollbar {
+      width: 2px;
     }
-    .header { padding: 2px 5px; }
-    .header .logo { font-size: 12px; }
-    .header .title { font-size: 10px; }
-    .mode-btn { font-size: 9px; height: 22px; padding: 0 5px; min-width: 26px; }
-    .token-badge { font-size: 8px; height: 18px; }
-    .clear-btn { font-size: 7px; height: 18px; }
-    .messages { padding: 3px 5px; gap: 3px; }
-    .msg { font-size: 12px; padding: 4px 7px; }
-    .input-area { padding: 2px 5px; }
-    .input-area textarea { font-size: 12px; padding: 3px 6px; height: 26px; }
-    .input-area .send-btn { width: 32px; height: 32px; min-width: 32px; min-height: 32px; font-size: 14px; }
-    .typing { padding: 6px 10px; }
-    .typing span { width: 4px; height: 4px; }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .msg { animation: none; }
-    .typing span { animation: none; opacity: 0.6; }
-    .undo-toast { animation: none; }
-  }
-</style>
+    ::-webkit-scrollbar-thumb {
+      background: #555;
+      border-radius: 2px;
+    }
+    /* 主容器 */
+    #app {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+    /* ----- 折叠按钮 (悬浮) ----- */
+    #toggleBtn {
+      position: fixed;
+      bottom: 30px;
+      right: 20px;
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      background: #1c7ed6;
+      border: none;
+      color: #fff;
+      font-size: 28px;
+      box-shadow: 0 4px 12px rgba(28, 126, 214, 0.5);
+      z-index: 999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.2s, opacity 0.2s;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    #toggleBtn:active {
+      transform: scale(0.88);
+      opacity: 0.7;
+    }
+    #toggleBtn .badge {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      background: #ff3b30;
+      color: #fff;
+      border-radius: 50%;
+      width: 22px;
+      height: 22px;
+      font-size: 12px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid #000;
+      display: none;
+    }
+    #toggleBtn .badge.show {
+      display: flex;
+    }
+    /* ----- 聊天面板 (折叠/展开) ----- */
+    #chatPanel {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #0a0a0c;
+      display: flex;
+      flex-direction: column;
+      transform: translateY(100%);
+      transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      z-index: 1000;
+      padding: 12px 12px 8px 12px;
+      padding-bottom: calc(8px + env(safe-area-inset-bottom));
+    }
+    #chatPanel.open {
+      transform: translateY(0);
+    }
+    /* 顶部栏 */
+    #header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #2c2c2e;
+      flex-shrink: 0;
+    }
+    #header .title {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #header .title i {
+      color: #1c7ed6;
+      font-size: 20px;
+    }
+    #header .actions {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+    }
+    #header .actions button {
+      background: none;
+      border: none;
+      color: #8e8e93;
+      font-size: 20px;
+      cursor: pointer;
+      padding: 4px;
+      touch-action: manipulation;
+      transition: color 0.2s, transform 0.1s;
+    }
+    #header .actions button:active {
+      transform: scale(0.85);
+      color: #fff;
+    }
+    #header .actions .close-btn {
+      font-size: 24px;
+    }
+    /* Token 状态条 */
+    #tokenBar {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: #8e8e93;
+      padding: 6px 2px;
+      border-bottom: 1px solid #1c1c1e;
+      flex-shrink: 0;
+    }
+    #tokenBar .total-tokens {
+      color: #f5f5f7;
+    }
+    /* 消息列表 */
+    #messageList {
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 8px 0 4px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .msg {
+      max-width: 88%;
+      padding: 10px 14px;
+      border-radius: 18px;
+      font-size: 16px;
+      line-height: 1.45;
+      word-break: break-word;
+      animation: fadeIn 0.2s ease;
+    }
+    .msg.user {
+      align-self: flex-end;
+      background: #1c7ed6;
+      color: #fff;
+      border-bottom-right-radius: 6px;
+    }
+    .msg.assistant {
+      align-self: flex-start;
+      background: #1c1c1e;
+      color: #f5f5f7;
+      border-bottom-left-radius: 6px;
+    }
+    .msg .timestamp {
+      font-size: 10px;
+      opacity: 0.6;
+      margin-top: 6px;
+      text-align: right;
+    }
+    /* Markdown 渲染 (白名单) */
+    .msg.assistant p {
+      margin: 4px 0;
+    }
+    .msg.assistant strong {
+      font-weight: 700;
+      color: #ffb347;
+    }
+    .msg.assistant em {
+      font-style: italic;
+      color: #78c0ff;
+    }
+    .msg.assistant code {
+      background: #2c2c2e;
+      padding: 0 6px;
+      border-radius: 4px;
+      font-family: 'SF Mono', monospace;
+      font-size: 14px;
+      color: #e6b450;
+    }
+    .msg.assistant pre {
+      background: #1c1c1e;
+      padding: 10px;
+      border-radius: 8px;
+      overflow-x: auto;
+      margin: 6px 0;
+      border-left: 3px solid #1c7ed6;
+    }
+    .msg.assistant pre code {
+      background: transparent;
+      padding: 0;
+      color: #d4d4d4;
+      font-size: 14px;
+    }
+    .msg.assistant ul {
+      padding-left: 20px;
+      margin: 4px 0;
+    }
+    .msg.assistant li {
+      list-style-type: disc;
+    }
+    /* 输入区域 */
+    #inputArea {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #2c2c2e;
+      flex-shrink: 0;
+      background: #0a0a0c;
+    }
+    #inputArea .input-wrap {
+      flex: 1;
+      background: #1c1c1e;
+      border-radius: 20px;
+      padding: 6px 12px;
+      display: flex;
+      align-items: flex-end;
+    }
+    #inputArea textarea {
+      width: 100%;
+      background: transparent;
+      border: none;
+      color: #f5f5f7;
+      font-size: 16px;
+      resize: none;
+      outline: none;
+      min-height: 36px;
+      max-height: 100px;
+      line-height: 1.4;
+      font-family: -apple-system, Helvetica, sans-serif;
+      padding: 4px 0;
+    }
+    #inputArea textarea::placeholder {
+      color: #636366;
+    }
+    #inputArea .token-preview {
+      font-size: 10px;
+      color: #8e8e93;
+      white-space: nowrap;
+      margin-left: 6px;
+      align-self: center;
+    }
+    #inputArea .send-btn {
+      background: #1c7ed6;
+      border: none;
+      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      color: #fff;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      touch-action: manipulation;
+    }
+    #inputArea .send-btn:active {
+      transform: scale(0.88);
+      background: #1565b0;
+    }
+    #inputArea .send-btn:disabled {
+      opacity: 0.4;
+      pointer-events: none;
+    }
+    /* 设置区域 (API Key) */
+    #settings {
+      padding: 4px 0 6px 0;
+      border-bottom: 1px solid #1c1c1e;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    #settings input {
+      flex: 1;
+      background: #1c1c1e;
+      border: none;
+      border-radius: 14px;
+      padding: 6px 12px;
+      color: #f5f5f7;
+      font-size: 13px;
+      outline: none;
+      min-width: 0;
+    }
+    #settings input::placeholder {
+      color: #636366;
+    }
+    #settings .save-key {
+      background: none;
+      border: none;
+      color: #1c7ed6;
+      font-size: 18px;
+      padding: 4px 8px;
+      cursor: pointer;
+    }
+    /* 动画 */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    /* 加载指示器 (三个点) */
+    .typing-indicator {
+      display: inline-flex;
+      gap: 4px;
+      align-items: center;
+      background: #1c1c1e;
+      padding: 8px 16px;
+      border-radius: 18px;
+      align-self: flex-start;
+    }
+    .typing-indicator span {
+      width: 8px;
+      height: 8px;
+      background: #8e8e93;
+      border-radius: 50%;
+      animation: bounce 1.4s infinite both;
+    }
+    .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bounce {
+      0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+      40% { transform: scale(1); opacity: 1; }
+    }
+    /* 空状态 */
+    .empty-state {
+      text-align: center;
+      color: #636366;
+      margin-top: 40px;
+      font-size: 14px;
+    }
+    .empty-state i {
+      font-size: 40px;
+      margin-bottom: 12px;
+      display: block;
+      color: #2c2c2e;
+    }
+  </style>
 </head>
 <body>
-
 <div id="app">
-  <!-- 顶栏 -->
-  <div class="header">
-    <span class="logo">🤖</span>
-    <span class="title">DeepSeek</span>
-    <div class="spacer"></div>
-    <div class="mode-group" id="modeGroup">
-      <button class="mode-btn" data-mode="normal" ontouchend="switchMode('normal')" onclick="switchMode('normal')">普通</button>
-      <button class="mode-btn active" data-mode="reason" ontouchend="switchMode('reason')" onclick="switchMode('reason')">推理</button>
-    </div>
-    <div class="token-badge">
-      <span>⚡</span>
-      <span class="num" id="tokenCount">0</span>
-    </div>
-    <button class="clear-btn" id="clearBtn" ontouchend="clearChat()" onclick="clearChat()">🗑</button>
-  </div>
+  <!-- 折叠按钮 -->
+  <button id="toggleBtn" aria-label="展开对话">
+    <i class="fas fa-comment-dots"></i>
+    <span class="badge" id="badge">0</span>
+  </button>
 
-  <!-- 消息列表 -->
-  <div class="messages" id="messages"></div>
+  <!-- 聊天面板 -->
+  <div id="chatPanel">
+    <!-- 头部 -->
+    <div id="header">
+      <div class="title">
+        <i class="fas fa-brain"></i> DeepSeek
+      </div>
+      <div class="actions">
+        <button id="clearBtn" aria-label="清空对话"><i class="fas fa-trash-alt"></i></button>
+        <button id="closePanelBtn" class="close-btn" aria-label="折叠"><i class="fas fa-chevron-down"></i></button>
+      </div>
+    </div>
 
-  <!-- 输入区 -->
-  <div class="input-area">
-    <textarea id="input" rows="1" placeholder="输入消息…" ontouchend="this.focus()" onkeydown="onInputKeydown(event)" oninput="autoResizeInput()"></textarea>
-    <button class="send-btn" id="sendBtn" ontouchend="sendMessage()" onclick="sendMessage()">➤</button>
+    <!-- 设置 API Key -->
+    <div id="settings">
+      <input type="text" id="apiKeyInput" placeholder="输入 DeepSeek API Key">
+      <button class="save-key" id="saveKeyBtn"><i class="fas fa-check-circle"></i></button>
+    </div>
+
+    <!-- Token 状态 -->
+    <div id="tokenBar">
+      <span>预估输入: <span id="inputTokens">0</span> tokens</span>
+      <span class="total-tokens">总消耗: <span id="totalTokens">0</span> tokens</span>
+    </div>
+
+    <!-- 消息列表 -->
+    <div id="messageList">
+      <div class="empty-state">
+        <i class="fas fa-comment"></i>
+        开始你的对话吧
+      </div>
+    </div>
+
+    <!-- 输入区域 -->
+    <div id="inputArea">
+      <div class="input-wrap">
+        <textarea id="userInput" rows="1" placeholder="输入消息..." autocomplete="off"></textarea>
+        <span class="token-preview" id="inputTokenPreview">0</span>
+      </div>
+      <button class="send-btn" id="sendBtn"><i class="fas fa-paper-plane"></i></button>
+    </div>
   </div>
 </div>
 
 <script>
-/* ================================================================
-   DeepSeek Chat — Apple Watch S11 优化版
-   修复：清空按钮改用无弹窗方案 + 撤销 toast
-   ================================================================ */
+  (function(){
+    "use strict";
 
-const CONFIG = {
-  apiKey: 'sk-319547dddd5e48cb97f97b08dd0e004a',
-  baseUrl: 'https://api.deepseek.com',
-  model: 'deepseek-v4-flash'
-};
+    // ----- DOM 引用 -----
+    const toggleBtn = document.getElementById('toggleBtn');
+    const chatPanel = document.getElementById('chatPanel');
+    const closePanelBtn = document.getElementById('closePanelBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const messageList = document.getElementById('messageList');
+    const userInput = document.getElementById('userInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const apiKeyInput = document.getElementById('apiKeyInput');
+    const saveKeyBtn = document.getElementById('saveKeyBtn');
+    const totalTokensSpan = document.getElementById('totalTokens');
+    const inputTokensSpan = document.getElementById('inputTokens');
+    const inputTokenPreview = document.getElementById('inputTokenPreview');
+    const badge = document.getElementById('badge');
 
-// ====== 状态 ======
-let mode = 'reason';
-let totalTokens = 0;
-let isLoading = false;
-let messages = [];
-let undoSnapshot = null;        // 保存清空前历史，供撤销
+    // ----- 状态 -----
+    let isOpen = false;
+    let messages = [];              // { role, content, timestamp? }
+    let totalTokens = 0;
+    let isWaiting = false;          // 是否正在等待 AI 回复
+    let currentAssistantMsg = null; // 用于流式拼接的 DOM 元素
+    let abortController = null;
 
-// ====== DOM ======
-const $ = id => document.getElementById(id);
-const msgEl = $('messages');
-const inputEl = $('input');
-const sendBtn = $('sendBtn');
-const tokenEl = $('tokenCount');
-const clearBtn = $('clearBtn');
-const modeBtns = document.querySelectorAll('.mode-btn');
+    // ----- 存储键名 -----
+    const STORAGE_KEY = 'deepseek_watch_chat';
+    const API_KEY_STORAGE = 'deepseek_watch_apikey';
 
-// ====== 模式切换 ======
-function switchMode(m) {
-  mode = m;
-  modeBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === m));
-  inputEl.focus();
-}
+    // ----- 初始化 tiktoken (cl100k_base) -----
+    let tokenEncoder = null;
+    async function initTiktoken() {
+      try {
+        // 使用全局的 tiktoken (从 CDN 加载)
+        const { Tiktoken } = window.tiktoken;
+        tokenEncoder = await Tiktoken.getEncoding('cl100k_base');
+      } catch (e) {
+        console.warn('tiktoken 加载失败，将使用粗略估算', e);
+        // 降级: 简单字符数 / 4
+        tokenEncoder = {
+          encode: (text) => { return { length: Math.ceil(text.length / 4) }; }
+        };
+      }
+    }
 
-// ====== 显示/隐藏清空按钮 ======
-function updateClearBtn() {
-  clearBtn.classList.toggle('visible', messages.length > 0);
-}
-
-// ====== 追加消息 ======
-function appendMessage(text, role, isStreaming) {
-  const div = document.createElement('div');
-  div.className = `msg ${role}`;
-  if (role === 'user') {
-    div.textContent = text;
-  } else if (role === 'error') {
-    div.textContent = '⚠️ ' + text;
-  }
-  msgEl.appendChild(div);
-  if (!isStreaming) {
-    requestAnimationFrame(() => { msgEl.scrollTop = msgEl.scrollHeight; });
-  }
-  return div;
-}
-
-// ====== 加载动画 ======
-function showLoading() {
-  const id = 'load-' + Date.now();
-  const div = document.createElement('div');
-  div.id = id;
-  div.className = 'typing';
-  div.innerHTML = '<span></span><span></span><span></span>';
-  msgEl.appendChild(div);
-  msgEl.scrollTop = msgEl.scrollHeight;
-  return id;
-}
-
-// ====== 撤销 Toast ======
-function showUndoToast() {
-  // 移除已有的 toast
-  const old = document.querySelector('.undo-toast');
-  if (old) old.remove();
-
-  const toast = document.createElement('div');
-  toast.className = 'undo-toast';
-  toast.innerHTML = `
-    <span>✅ 已清空</span>
-    <button class="undo-btn" ontouchend="undoClear()" onclick="undoClear()">撤销</button>
-  `;
-  document.getElementById('app').appendChild(toast);
-
-  // 3 秒后自动消失
-  setTimeout(() => {
-    if (toast.parentNode) toast.remove();
-    undoSnapshot = null;
-  }, 3000);
-}
-
-// ====== 清空对话（无 confirm，直接清） ======
-function clearChat() {
-  if (messages.length === 0) return;
-
-  // 保存快照以便撤销
-  undoSnapshot = {
-    messages: JSON.parse(JSON.stringify(messages)),
-    totalTokens: totalTokens,
-    html: msgEl.innerHTML
-  };
-
-  messages = [];
-  totalTokens = 0;
-  tokenEl.textContent = '0';
-  msgEl.innerHTML = '<div style="text-align:center;color:var(--text2);font-size:11px;padding:16px 0;">💬 开始新对话</div>';
-  updateClearBtn();
-  inputEl.focus();
-
-  // 显示撤销提示
-  showUndoToast();
-}
-
-// ====== 撤销清空 ======
-function undoClear() {
-  if (!undoSnapshot) return;
-
-  messages = undoSnapshot.messages;
-  totalTokens = undoSnapshot.totalTokens;
-  tokenEl.textContent = totalTokens;
-  msgEl.innerHTML = undoSnapshot.html;
-
-  // 移除 toast
-  const toast = document.querySelector('.undo-toast');
-  if (toast) toast.remove();
-
-  undoSnapshot = null;
-  updateClearBtn();
-  msgEl.scrollTop = msgEl.scrollHeight;
-}
-
-// ====== 发送消息 ======
-async function sendMessage() {
-  const text = inputEl.value.trim();
-  if (!text || isLoading) return;
-
-  inputEl.value = '';
-  autoResizeInput();
-
-  appendMessage(text, 'user');
-  messages.push({ role: 'user', content: text });
-
-  const loadingId = showLoading();
-  updateClearBtn();
-  isLoading = true;
-  sendBtn.disabled = true;
-
-  const aiDiv = document.createElement('div');
-  aiDiv.className = 'msg ai';
-  msgEl.appendChild(aiDiv);
-
-  let reasoningDiv = null;
-  let reasoningEl = null;
-  let reasoningText = '';
-  let contentText = '';
-  let isReasonPhase = (mode === 'reason');
-
-  if (mode === 'reason') {
-    reasoningDiv = document.createElement('div');
-    reasoningDiv.className = 'reasoning-block';
-    reasoningDiv.innerHTML = '<span class="reason-label">🧠 推理</span><div class="reason-content"></div>';
-    const toggle = document.createElement('button');
-    toggle.className = 'reason-toggle';
-    toggle.textContent = '收起';
-    toggle.onclick = toggle.ontouchend = function(e) {
-      e.stopPropagation();
-      const rc = reasoningDiv.querySelector('.reason-content');
-      const hidden = rc.style.display === 'none';
-      rc.style.display = hidden ? 'block' : 'none';
-      this.textContent = hidden ? '收起' : '展开';
-    };
-    reasoningDiv.appendChild(toggle);
-    aiDiv.appendChild(reasoningDiv);
-    reasoningEl = reasoningDiv.querySelector('.reason-content');
-  }
-
-  const contentDiv = document.createElement('div');
-  contentDiv.className = 'msg-content';
-  aiDiv.appendChild(contentDiv);
-
-  msgEl.scrollTop = msgEl.scrollHeight;
-
-  try {
-    const body = {
-      model: CONFIG.model,
-      messages: messages.map(m => {
-        const msg = { role: m.role, content: m.content };
-        if (m.role === 'assistant' && m.reasoning_content) {
-          msg.reasoning_content = m.reasoning_content;
+    // ----- 计算 Token (实时) -----
+    function countTokens(text) {
+      if (!text) return 0;
+      if (tokenEncoder) {
+        try {
+          const encoded = tokenEncoder.encode(text);
+          return encoded.length;
+        } catch (e) {
+          return Math.ceil(text.length / 4);
         }
-        return msg;
-      }),
-      stream: true,
-      ...(mode === 'reason' ? { reasoning_effort: 'high' } : {}),
-      extra_body: {
-        thinking: { type: mode === 'reason' ? 'enabled' : 'disabled' }
+      } else {
+        return Math.ceil(text.length / 4);
       }
-    };
-
-    const resp = await fetch(CONFIG.baseUrl + '/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + CONFIG.apiKey
-      },
-      body: JSON.stringify(body)
-    });
-
-    if (!resp.ok) {
-      const errText = await resp.text();
-      throw new Error(`API ${resp.status}: ${errText}`);
     }
 
-    const reader = resp.body.getReader();
-    const decoder = new TextDecoder();
-    let buf = '';
-    let pendingUpdate = false;
+    // ----- 更新 Token 显示 -----
+    function updateTokenPreviews() {
+      const inputText = userInput.value;
+      const count = countTokens(inputText);
+      inputTokensSpan.textContent = count;
+      inputTokenPreview.textContent = count;
+    }
 
-    const scheduleUpdate = () => {
-      if (pendingUpdate) return;
-      pendingUpdate = true;
-      requestAnimationFrame(() => {
-        pendingUpdate = false;
-        if (reasoningEl && reasoningText) reasoningEl.textContent = reasoningText;
-        if (contentText) contentDiv.textContent = contentText;
-        msgEl.scrollTop = msgEl.scrollHeight;
+    // ----- 渲染消息 (支持白名单 Markdown) -----
+    function renderMarkdown(text) {
+      if (!text) return '';
+      // 使用 marked 解析
+      let html = marked.parse(text, { breaks: true, gfm: true });
+      // 使用 DOMPurify 清洗，只保留安全标签 (白名单)
+      const allowedTags = ['strong', 'em', 'code', 'pre', 'ul', 'li', 'p', 'br', 'span'];
+      const clean = DOMPurify.sanitize(html, {
+        ALLOWED_TAGS: allowedTags,
+        ALLOWED_ATTR: ['class'],
+        FORBID_ATTR: ['style', 'onerror', 'onload'],
       });
-    };
+      return clean;
+    }
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+    function createMessageElement(role, content, timestamp) {
+      const div = document.createElement('div');
+      div.className = `msg ${role}`;
+      if (role === 'assistant') {
+        // 使用 innerHTML 渲染 Markdown
+        div.innerHTML = renderMarkdown(content);
+      } else {
+        div.textContent = content;
+      }
+      if (timestamp) {
+        const timeSpan = document.createElement('div');
+        timeSpan.className = 'timestamp';
+        timeSpan.textContent = new Date(timestamp).toLocaleTimeString();
+        div.appendChild(timeSpan);
+      }
+      return div;
+    }
 
-      buf += decoder.decode(value, { stream: true });
-      const lines = buf.split('\n');
-      buf = lines.pop() || '';
+    // ----- 重新渲染所有消息 -----
+    function renderAllMessages() {
+      messageList.innerHTML = '';
+      if (messages.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'empty-state';
+        empty.innerHTML = '<i class="fas fa-comment"></i>开始你的对话吧';
+        messageList.appendChild(empty);
+        return;
+      }
+      // 显示所有消息，除了可能还在流式拼接的那条（但我们已经单独处理）
+      messages.forEach(msg => {
+        const el = createMessageElement(msg.role, msg.content, msg.timestamp);
+        messageList.appendChild(el);
+      });
+      scrollToBottom();
+    }
 
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const data = line.slice(6).trim();
-        if (data === '[DONE]') continue;
+    function scrollToBottom() {
+      setTimeout(() => {
+        messageList.scrollTop = messageList.scrollHeight;
+      }, 50);
+    }
 
-        try {
-          const chunk = JSON.parse(data);
-          const delta = chunk.choices?.[0]?.delta;
-          if (!delta) continue;
-
-          if (delta.reasoning_content) {
-            isReasonPhase = true;
-            reasoningText += delta.reasoning_content;
-            scheduleUpdate();
-          }
-
-          if (delta.content) {
-            if (isReasonPhase && reasoningDiv) {
-              isReasonPhase = false;
-              const sep = document.createElement('div');
-              sep.style.cssText = 'border-top:1px solid var(--border);margin:4px 0';
-              aiDiv.insertBefore(sep, contentDiv);
-            }
-            contentText += delta.content;
-            scheduleUpdate();
-          }
-
-          if (chunk.usage) {
-            totalTokens += (chunk.usage.total_tokens || 0);
-            tokenEl.textContent = totalTokens;
-          }
-        } catch (_) {}
+    // ----- 保存到 localStorage -----
+    function saveChat() {
+      try {
+        const data = {
+          messages: messages,
+          totalTokens: totalTokens,
+          timestamp: Date.now()
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch (e) {
+        console.warn('保存失败', e);
       }
     }
 
-    if (buf.startsWith('data: ')) {
-      const d = buf.slice(6).trim();
-      if (d !== '[DONE]') {
-        try {
-          const c = JSON.parse(d);
-          if (c.usage) {
-            totalTokens += (c.usage.total_tokens || 0);
-            tokenEl.textContent = totalTokens;
-          }
-        } catch(_) {}
+    // ----- 加载历史 -----
+    function loadChat() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return false;
+        const data = JSON.parse(raw);
+        if (data.messages && Array.isArray(data.messages)) {
+          messages = data.messages;
+          totalTokens = data.totalTokens || 0;
+          totalTokensSpan.textContent = totalTokens;
+          renderAllMessages();
+          return true;
+        }
+      } catch (e) {
+        console.warn('加载历史失败', e);
+      }
+      return false;
+    }
+
+    // ----- 清空对话 -----
+    function clearChat() {
+      if (isWaiting) return;
+      messages = [];
+      totalTokens = 0;
+      totalTokensSpan.textContent = '0';
+      saveChat();
+      renderAllMessages();
+      updateBadge();
+    }
+
+    // ----- 更新未读标记 (此处用于总消息数) -----
+    function updateBadge() {
+      const count = messages.filter(m => m.role === 'assistant').length;
+      if (count > 0 && !isOpen) {
+        badge.textContent = count;
+        badge.classList.add('show');
+      } else {
+        badge.classList.remove('show');
       }
     }
 
-    if (reasoningEl && reasoningText) reasoningEl.textContent = reasoningText;
-    if (contentText) contentDiv.textContent = contentText;
-    msgEl.scrollTop = msgEl.scrollHeight;
-
-    const assistantMsg = { role: 'assistant', content: contentText };
-    if (mode === 'reason' && reasoningText) {
-      assistantMsg.reasoning_content = reasoningText;
+    // ----- 添加消息并保存 -----
+    function addMessage(role, content) {
+      const msg = {
+        role: role,
+        content: content,
+        timestamp: Date.now()
+      };
+      messages.push(msg);
+      saveChat();
+      // 渲染新消息
+      const el = createMessageElement(role, content, msg.timestamp);
+      // 移除空状态
+      const empty = messageList.querySelector('.empty-state');
+      if (empty) empty.remove();
+      messageList.appendChild(el);
+      scrollToBottom();
+      updateBadge();
+      return el;
     }
-    messages.push(assistantMsg);
 
-  } catch (err) {
-    aiDiv.remove();
-    appendMessage(err.message, 'error');
-    console.error(err);
-  } finally {
-    const loading = document.getElementById(loadingId);
-    if (loading) loading.remove();
-    isLoading = false;
-    sendBtn.disabled = false;
-    inputEl.focus();
-    msgEl.scrollTop = msgEl.scrollHeight;
-  }
-}
+    // ----- 发送消息 (核心) -----
+    async function sendMessage() {
+      if (isWaiting) return;
+      const text = userInput.value.trim();
+      if (!text) return;
+      const apiKey = apiKeyInput.value.trim();
+      if (!apiKey) {
+        alert('请先输入有效的 DeepSeek API Key');
+        return;
+      }
 
-// ====== 输入框 ======
-function autoResizeInput() {
-  inputEl.style.height = 'auto';
-  inputEl.style.height = Math.min(inputEl.scrollHeight, 80) + 'px';
-}
+      // 添加用户消息
+      addMessage('user', text);
+      userInput.value = '';
+      updateTokenPreviews();
+      // 禁用发送按钮，显示等待状态
+      isWaiting = true;
+      sendBtn.disabled = true;
 
-function onInputKeydown(e) {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    sendMessage();
-  }
-}
+      // 显示占位 AI 消息 (会动态更新)
+      const assistantPlaceholder = document.createElement('div');
+      assistantPlaceholder.className = 'msg assistant';
+      assistantPlaceholder.textContent = '...';
+      messageList.appendChild(assistantPlaceholder);
+      scrollToBottom();
 
-// ====== 初始化 ======
-(function init() {
-  msgEl.innerHTML = '<div style="text-align:center;color:var(--text2);font-size:11px;padding:16px 0;">💬 开始对话</div>';
-  switchMode('reason');
-  updateClearBtn();
+      // 构造请求参数
+      const systemPrompt = `你是一个运行在 Apple Watch 上的 AI 助手。受手表端渲染引擎限制，请严格遵守以下输出格式规范：
+1. 仅允许使用以下 Markdown 语法：**加粗**、*斜体*、\`行内代码\`、- 无序列表、\`\`\`代码块\`\`\`。
+2. 严禁使用：表格（| 符号）、一级/二级标题（#）、图片链接（![]()）、HTML 标签（如 <div> 等）、引用块（>）等复杂语法，以免渲染异常。
+3. 输出长度不受限制，无需刻意精简，但内容需结构清晰。若涉及步骤或并列要点，请优先使用 - 列表分行展示。`;
 
-  console.log('⌚ DeepSeek Chat · Watch S11 已启动');
-})();
-</script>
-</body>
-</html>
+      const requestMessages = [
+        { role: 'system', content: systemPrompt },
+        ...messages.slice(0, -1) // 不包括刚加入的用户消息？但我们已经加了，实际上 messages 已包含用户消息，但为了节省上下文，可以只取最近若干条。为简单，取全部（最多20条）
+      ];
+      // 但为了确保包含最后一条用户消息，我们用 messages 数组。
+      // 注意：上面 addMessage 已经加入，所以 messages 已经包含了最新用户消息。
+      // 但我们需要在请求中传递所有消息（包括刚添加的），所以直接使用 messages。
+      // 但 system 应该在最前。
+      const payloadMessages = [
+        { role: 'system', content: systemPrompt },
+        ...messages
+      ];
+
+      // 如果太长，截断至最近 20 条（防止超上下文）
+      if (payloadMessages.length > 20) {
+        // 保留 system + 最近 19 条
+        const keep = payloadMessages.slice(-19);
+        payloadMessages = [payloadMessages[0], ...keep];
+      }
+
+      const requestBody = {
+        model: 'deepseek-chat',
+        messages: payloadMessages,
+        stream: true,
+        max_tokens: 2000,
+        temperature: 0.7
+      };
+
+      let accumulatedContent = '';
+      let finishReason = '';
+
+      try {
+        abortController = new AbortController();
+        const response = await fetch('https://api.deepseek.com/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify(requestBody),
+          signal: abortController.signal
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`API 错误 (${response.status}): ${errText}`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const line
